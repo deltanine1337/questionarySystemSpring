@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SPA</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        var login;
+        var questionary;
+        var something;
+        var userAnswers;
+        var selectedQuest;
+        var selectedLogin;
+        $(document).ready(function () {
+            $('body').click(function(event) {
+                something = event.target.value;
+            });
+        });
+
+        const loadUserAnswerPage = function () {
+            $(document).ready(function() {
+                $('body').html("");
+                $('body').append('<p><button class="btn btn-warning" onclick="getQuests()">Назад</button></p>');
+                $('body').append('<select style="margin:0 25% 0 25%; width:50%;" class="custom-select" id="userSelector" size="1"></select>');
+                $('body').append('<select style="margin:0 25% 0 25%; width:50%;" class="custom-select" id="questSelector" size="1"></select>');
+                $('body').append('<p><button style="margin:0 25% 0 25%; width:10%;" class="btn btn-success btn-sm" onclick="getUserAnswers()">Посмотреть ответы</button></p>');
+                $('body').append('<div style="margin:0 25% 0 25%; width:50%;" id="answerResult"></div>');
+                $.ajax({
+                    url: "usersquestionaries/getall",
+                    method: "GET"
+                }).then(function(data) {
+                    $.each(data, function (index, value) {
+                        $('#userSelector').append('<option value="'+ data[index].user.login + '">' + data[index].user.login + '</option>');
+                        $('#questSelector').append('<option value="' + data[index].questionary.name + '">' + data[index].questionary.name + '</option>');
+                    });
+                    var usedNames = {};
+                    $("select > option").each(function () {
+                        if(usedNames[this.text]) {
+                            $(this).remove();
+                        } else {
+                            usedNames[this.text] = this.value;
+                        }});
+                });
+            });
+        };
+
+        const getUserAnswers = function () {
+            selectedLogin = $('#userSelector').val();
+            selectedQuest = $('#questSelector').val();
+            $(document).ready(function() {
+                $.ajax({
+                    url: "questionaries/" + selectedLogin + "/answers/" + selectedQuest,
+                    method: "GET"
+                }).then(function(data) {
+                    $('#answerResult').html("");
+                    if (data.length != 0) {
+                            var qindex = -1;
+                            var qnumber = 0;
+                            $.each(data, function (index, value) {
+                                if (data[index].question.id_question != qindex) {
+                                    qnumber++;
+                                    $('<h4 class="h4">' + qnumber + '. ' + data[index].question.formulation + '</h4>').appendTo('#answerResult');
+                                    qindex = data[index].question.id_question;
+                                }
+                                $('<p style="margin-left:25px;">' + data[index].formulation + '</p>').appendTo('#answerResult');
+                            });
+                    }
+                    else {
+                        $('#answerResult').append('Пользователь не отвечал на этот опрос');
+                    }
+                });
+            });
+        };
+
+        const saveQuest = function () {
+            $('#user1Answers').val('');
+            $('#answerInp:checked').each(function() {
+                $('#user1Answers').val($('#user1Answers').val() + $(this).val() + '@');
+            });
+            $('#saveButton').attr('disabled',false);
+            userAnswers = $('#user1Answers').val();
+            const data1 = {"login": login, "id_questionary": questionary, "answers": userAnswers};
+            $.ajax({
+                url: "/questionaries/" + login + "/fill/" + questionary + "/save",
+                contentType : 'application/json',
+                data: JSON.stringify(data1),
+                method: "POST",
+                success : function(result) {
+                    getQuests();
+                }
+            });
+        };
+
+        const getAnswers = function () {
+            $(document).ready(function() {
+                $('body').html("");
+                $('body').append('<input id="user1Answers" name="userAnswers" type="hidden" value="">');
+                questionary = something;
+                $.ajax({
+                    url: "/questionaries/" + login + "/fill/" + questionary,
+                    method: "GET"
+                }).then(function(data) {
+                    var qindex = -1;
+                    var qnumber = 0;
+                    $.each(data, function (index, value) {
+                        if (data[index].question.id_question != qindex) {
+                            qnumber++;
+                            $('<h4 class="h4">' + qnumber + '. ' + data[index].question.formulation + '</h4>').appendTo('body');
+                            qindex = data[index].question.id_question;
+                        }
+                        if (data[index].question.num_of_answers == 1){
+                            $('<p style="margin-left:25px;"><input id="answerInp" type="radio" name="' + data[index].question.id_question + '" value="' + data[index].id_answer + '">   ' + data[index].formulation + '</p>').appendTo('body');
+                        }
+                        else {
+                            $('<p style="margin-left:25px;"><input id="answerInp" type="checkbox" value="' + data[index].id_answer + '">   ' + data[index].formulation + '</p>').appendTo('body');
+                        }
+                    });
+                    $('body').append('<button style="margin-top:5px; text-align: center;" class="btn btn-success btn-lg" id="saveButton" onclick="saveQuest()">Сохранить</button>');
+                });
+            });
+        };
+
+        const getQuests = function () {
+            $(document).ready(function() {
+                    $('body').html("");
+                    $('body').append('<p><button class="btn btn-warning" onclick="start()">Войти</button></p>');
+                    $.ajax({
+                        url: "/questionaries/" + login,
+                        method: "GET"
+                    }).then(function(data) {
+                        $.each(data, function (index, value) {
+                            $('body').append('<p style="padding-top:3px;padding-left:15px;" align="center"><input type="button" class="btn btn-success btn-lg" value="' + data[index].name + '" onclick="getAnswers()"></p>');
+                        });
+                        $('body').append('<p style="padding-top:3px;padding-left:15px;" align="center"><input type="button" class="btn btn-info" value="Ответы пользователей" onclick="loadUserAnswerPage()"></p>');
+                    });
+            });
+        };
+
+        const fillDB = function () {
+            $.ajax({
+                url: "/insert",
+                method: "GET"
+            }).then(function(data) {
+                    $('body').append('<p align="center">БД успешно заполнена</p>');
+                });
+        };
+
+        const setUser = function () {
+            login = document.getElementById("login").value;
+            const data1 = {"login": login, "password": 123, "role": 1};
+            $.ajax({
+                url: "/register",
+                contentType : 'application/json',
+                data: JSON.stringify(data1),
+                method: "POST",
+                success : function(result) {
+                    getQuests();
+                }
+            });
+        };
+
+        const start = function () {
+            $('body').html("");
+            $('body').append('<div style="margin:0 25% 0 25%; width:50%;">' +
+                '    <h3>Введите имя пользователя</h3>\n' +
+                '    <p>Логин: <input type="text" id="login" class="form-control" maxlength="20" ></p>' +
+                '    <p align="center"><input type="button" class="btn btn-success btn-lg" align="center" value="Войти" onclick="setUser()"></p>' +
+                '    <p align="center"><input type="button" class="btn btn-danger" align="center" value="Заполнить БД" onclick="fillDB()"></p>' +
+                '</div>');
+        };
+    </script>
+</head>
+<body>
+<script>
+    start();
+</script>
+</body>
+</html>
